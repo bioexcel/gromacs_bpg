@@ -35,7 +35,7 @@ about finding this out.
 As well as general guidance applicable to whatever machine you may be
 running GROMACS on, the performance cookbook provides concrete
 examples showing how to obtain good performance on a number of
-specific PRACE (and in future EuroHPC) machines, both as an
+specific PRACE and EuroHPC machines, both as an
 illustration of the application of general best practice process for
 obtaining good performance, and to promote efficient usage of the
 named machines. The cookbook also provides a reference set of (near)
@@ -111,7 +111,7 @@ described above for CPU-only execution.
 
 By default GROMACS offloads short-range non-bonded force calculations
 (``-nb gpu``), PME calculations (``-pme gpu``) and, on NVIDIA GPUs,
-bonded force calculations (``-bonded gpu``). Currently (GROMACS 2020)
+bonded force calculations (``-bonded gpu``).  For GROMACS 2022
 PME offload to GPU can only be done by a single rank (i.e. a single
 GPU). PME offload is also subject to a number of further `known
 limitations
@@ -128,7 +128,7 @@ may be beneficial for an older GPU sitting alongside newer CPU.
 
 Constraint calculations and coordinate updates default to CPU but can
 be offloaded with ``-update gpu``, though only to NVIDIA GPUs, only if
-GROMACS is executes on a single rank, and currently (GROMACS 2020)
+GROMACS is executes on a single rank, and ( or GROMACS 2020)
 subject to further limitations (no free-energy, no virtual sites, no
 Ewald surface correction, no replica exchange, no constraint pulling,
 no orientation restraints and no computational electrophysiology).
@@ -191,13 +191,10 @@ providing added flexibility to help utilise all cores on each node.
 
 Broadly the same considerations as for single-node use apply with
 regards to determining an optimal choice of number of MPI ranks x
-OpenMP threads and GPU offloading options. However currently
-(GROMACS 2020) offloading of coordinate updates and constraints is not
-possible when running on more than one node as this restricts GROMACS
-to run on a single rank and hence on a single node. 
+OpenMP threads and GPU offloading options.  
 
-Offloading PME calculations to GPU can currently (GROMACS 2020) only
-take place on a single rank using a single GPU. The performance
+Offloading PME calculations to GPU can only
+take place on a single rank using a single GPU (GROMACS 2022). The performance
 advantage this typically gives over CPU-based PME computation on a
 single or small number of nodes can therefore start to diminish when
 running on larger numbers of nodes thanks to the growing compute power
@@ -212,16 +209,55 @@ available in a machine.
 
 
 
+----------------------------------------------------------
+General guidance for benchmarking 
+----------------------------------------------------------
 
-      
+Before beginning expensive ``mdrun`` simulations you should benchmark your
+system to ensure you are using the optimal amount of HPC resources.
+Usually this mean how many nodes/CPUs/GPUs you choose to use. 
+
+To do this you should take your system, run it for a short time (10,00 steps
+should be sufficient) and increase the number of CPUs. You then look at the 
+performance figure in ns/day. It is helpful to plot a graph of CPU count vs 
+performance. Examples of these are shown in the following section for different
+PRACE/EuroHPC machines.
+
+You will see that for increasing CPU count you get diminishing returns on 
+performance gains. It is up to you to choose a core count that balances
+the time you have to wait for the simulation to finish, and the cost of running
+the simulations. Often the appropriate number is the point on the performance 
+curve before it starts to plateau.
+
+Some mdrun flags that can help with benchmarking are:
+
+-  ``-dlb yes``  turns on dynamic load balancing which shifts particles between MPI ranks to optimize performance. This can interfere with the tunepme setting which will optimize various aspects of the PME and DD algorithms, shifting load between ranks.
+-  ``-notunepme`` turns off PME load balancing because it can interfere with the ``dlb yes`` setting. The PME settings can be tuned separately using ``gmx tune_pme``.
+-  ``-noconfout`` does not create the output conformation as this is not needed for benchmarking.
+-  ``-resethway`` resets the performance timers halfway through the run, this removes the overhead of initialization and load balancing from the reported timings.
+-  ``-nsteps 10000`` forces mdrun to run for only 10000 steps, this lets you run short benchmarks using your production ready tpr file.
+
+Things to investigate:
+
+- Some systems will have different versions of GROMACS built by different compilers, these often have
+  differing performance.
+- Some systems will have the ability to turn on Simultaneous Multi-Threading (SMT), it may provide a performance boost for GROMACS.
+- For large systems using many nodes then the use of Hybrid OpenMP/MPI cat offer increased performance over pure MPI.
+
+GPU specific notes:
+
+- For GPU systems you can try different GPU offload scenarios.
+- For GPU systems it is generally best to have 1 MPI rank or 1 thread-MPI rank per GPU, but this may not always be the case.
+- For GPU systems the parallel efficiency beyond 1 GPU is often poor, you will not see the same strong scaling as on CPU only systems. However the performance on 1 GPU should be greater than on an equivalent CPU node.
+  
+
 ----------------------------------------------------------
 Getting good GROMACS performance on PRACE/EuroHPC machines
 ----------------------------------------------------------
 
 This section provides guidance and concrete recipes showing how to
 build and run GROMACS for good performance on some of the largest
-EU-based supercomputers available to EU researchers through PRACE (and
-in future also EuroHPC).
+EU-based supercomputers available to EU researchers through PRACE and EuroHPC.
 
 General guidance for each machine is complemented by an analysis
 illustrating the effect of key runtime execution choices on ``mdrun``
@@ -287,7 +323,7 @@ GROMACS performance on HAWK (HLRS, Germany)
 -------------------------------------------
 https://www.hlrs.de/systems/hpe-apollo-hawk/
 
-HAWK is currently (November 2020) listed as number 16 on the Top500,
+HAWK is listed as number 16 on the Top500 (November 2020),
 the 6th largest European HPC system, and is accessible through PRACE
 access mechanisms. 
 
@@ -339,10 +375,7 @@ ranks and OpenMP threads per rank. Results using simultaneous
 multithreading (SMT) are not shown as these follow similar trends but
 broadly speaking yield slightly lower performance on HAWK for the
 benchmarks examined, even with compact placement assigned using
-``omplace``. Error bars (offset upward from measurements) indicate the
-hypothetical maximum obtainable performance if the combined load
-imbalances between spatial domains and between PP and PME ranks
-reported by GROMACS were absent.
+``omplace``. 
 
 It is clear there is a very significant effect on performance of the
 choice of MPI x OpenMP hybrid decomposition. As a general rule on HAWK
@@ -358,25 +391,25 @@ ranks.
 
 
 .. list-table:: 
-   :align: left
+   :align: center
 
-   * - .. figure:: results/hawk/20k_HBS_1smt_resethway_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/hawk/20k_HBS.svg
      
           **20k_HBS**
 
-     - .. figure:: results/hawk/benchMEM_1smt_resethway_dlbNO_tunepmeNO-nsperday.svg
+     - .. figure:: results/hawk/benchMEM.svg
 
           **benchMEM**
 	   
-   * - .. figure:: results/hawk/465k_HBS_1smt_resethway_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/hawk/465k_HBS.svg
 
           **465k_HBS**
 	   
-     - .. figure:: results/hawk/benchRIB_1smt_resethway_dlbNO_tunepmeNO-nsperday.svg
+     - .. figure:: results/hawk/benchRIB.svg
 
           **benchRIB**
 
-   * - .. figure:: results/hawk/benchPEP_1smt_resethway_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/hawk/benchPEP.svg
 
           **benchPEP**
 
@@ -413,9 +446,104 @@ and thereby determine an optimal choice for ``-npme``:
 
 
 
+GROMACS performance on Discoverer (PetaSC Bulgaria)
+---------------------------------------------------
+
+https://sofiatech.bg/en/petascale-supercomputer/
+
+**Hardware**
+
+Each node has:
+ - Processors: 2 x 64-core AMD EPYC 7H12 @ 2.6GHz
+ - Memory: 256 GB RAM
+ - Interconnect: Infiniband HDR 
+
+**Software**
+
+Relevant software stack on system (available to all users via environment modules):
+ - GCC, AOCC, and Intel oneAPI compilers
+ - MPICH, OpenMPI and Intel MPI libraries
 
 
-  
+**Build**
+
+A multinode-capable MPI-enabled version of GROMACS using OpenMPI and GCC with good performance on Discoverer can be built as follows:
+
+.. include:: build/discoverer/2021.4_openmpi.rst
+
+**Run**
+
+An example job script to run ``mdrun`` on Discoverer using 2 nodes for 1 hour with 128 mpi tasks per node is shown below.
+Each node on Discoverer has two 64-core AMD EPYC processors. This gives a total of 128 physical cores per node.
+The CPUs have Simultaneous Multi-Threading (SMT) which means each physical core has two logical cores, so each node will
+appear to have 256 cores to most applications. We have found that SMT offers a small performance benefit, thus recommend keeping it turned on. For most jobs this means per node you should have 128 MPI tasks (1 per physical core) and 2 OpenMP threads per MPI task (1 per logical core, 2 logical cores per physical core).
+
+For consistent benchmarking we use the additional arguments: 
+
+-  ``-dlb yes``  turns on dynamic load balancing which shifts particles between MPI ranks to optimize performance. This can interfere with the tunepme setting which will optimize various aspects of the PME and DD algorithms, shifting load between ranks.
+-  ``-notunepme`` turns off PME load balancing because it can interfere with the dlb yes setting. The PME settings can be tuned separately using gmx tune_pme.
+-  ``-noconfout`` does not create the output conformation as this is not needed for benchmarking.
+-  ``-resethway`` resets the performance timers halfway through the run, this removes the overhead of initialization and load balancing from the reported timings.
+
+.. include:: run/discoverer/jobscript.rst
+
+
+**Comparison of different builds**
+
+There are centrally installed versions of GROMACS than can be obtained by module load commands:
+
+- ``module load gromacs/2021/latest-intel-nogpu-mpi`` GCC compilers + MPICH MPI.
+- ``module load gromacs/2021/latest-intel-nogpu-openmpi-gcc`` GCC compilers + OpenMPI MPI.
+- ``module load gromacs/2021/latest-intel-nogpu-openmpi-aocc`` AOCC compilers + OpenMPI MPI.
+- ``module load gromacs/2021/latest-oneapi-nogpu-mpi`` Intel compilers + Intel MPI. 
+
+
+
+The figures below show the performance for the 4 different builds for the benchmark suite.
+
+
+.. list-table::
+   :align: center
+	   
+   * - .. figure:: results/discoverer/bench20k_HBS.svg
+     
+          **20k_HBS** -- 128 MPI x 2 OpenMP
+     
+     - .. figure:: results/discoverer/benchMEM.svg
+ 
+          **benchMEM** -- 128 MPI x 2 OpenMP
+	   
+   * - .. figure:: results/discoverer/bench465k_HBS.svg
+
+          **465k_HBS** -- 128 MPI x 2 OpenMP
+
+     - .. figure:: results/discoverer/benchRIB.svg
+
+          **benchRIB** -- 32 MPI x 8 OpenMP
+
+   * - .. figure:: results/discoverer/benchPEP.svg
+
+          **benchPEP** -- 128 MPI x 2 OpenMP
+
+     - .. 
+
+All benchmarks were run using 128 MPI task per node and 2 OpenMP threads per MPI task (SMT on). With the exception of benchRIB where 32 MPI tasks x 8 OpenMP threads were used.
+This was done because the error:
+
+:: 
+
+   Fatal error (abort):
+
+   There is no domain decomposition for N ranks that is compatible with the
+   given box and a minimum cell size of x nm
+   Change the number of ranks or mdrun option -rdd or -dds
+   Look in the log file for details on the domain decomposition
+ 
+
+is encountered when 1028 total MPI tasks are used, thus hybrid MPI/OpenMP parallelization must be used to scale up to 16 nodes.
+
+The results show that for the smaller systems best performance is obtained with OpenMPI and GCC, if Hybrid MPI and OpenMP is needed then MPICH gives the best performance, and for the largest system MPI+AOCC gives the best performance.
+
 
 GROMACS performance on Piz Daint (CSCS, Switzerland)
 ----------------------------------------------------
@@ -497,12 +625,9 @@ with increasing node count on Piz Daint for different combinations of
 GPU offload scenarios and for different combinations of MPI ranks and
 OpenMP threads, and with and without use of multithreading (SMT). Only
 the most relevant, i.e. some of the best-performing execution
-scenarios are shown for each benchmark. Error bars (offset upward from
-measurements) indicate the hypothetical maximum obtainable performance
-if the combined load imbalances between spatial domains and between PP
-and PME ranks reported by GROMACS were absent. Offloading of
+scenarios are shown for each benchmark. Offloading of
 coordinate updating is not included as this is only relevant for
-single node runs using a single rank, where it is however worth using
+single node runs using a single rank (GROMACS 2020), where it is however worth using
 to obtain good performance.
 
 As argued in the general guidance above for GPU offloading, there is a
@@ -527,23 +652,23 @@ should be offloaded to GPU.
 .. list-table::
    :align: center
 	   
-   * - .. figure:: results/pizdaint/20k_HBS_1smt_002mpi_006omp_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/pizdaint/20k_HBS.svg
      
           **20k_HBS** - 2 mpi x 6 omp (SMT off)
      
-     - .. figure:: results/pizdaint/benchMEM_2smt_004mpi_006omp_dlbNO_tunepmeNO-nsperday.svg
+     - .. figure:: results/pizdaint/benchMEM.svg
 
           **benchMEM** - 4 mpi x 6 omp (SMT on)
 	   
-   * - .. figure:: results/pizdaint/465k_HBS_2smt_008mpi_003omp_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/pizdaint/465k_HBS.svg
 
           **465k_HBS** - 8 mpi x 3 omp (SMT on)
 
-     - .. figure:: results/pizdaint/benchRIB_2smt_004mpi_006omp_dlbNO_tunepmeNO-nsperday.svg
+     - .. figure:: results/pizdaint/benchRIB.svg
 
           **benchRIB** - 4 mpi x 6 omp (SMT on)
 
-   * - .. figure:: results/pizdaint/benchPEP_2smt_004mpi_006omp_dlbNO_tunepmeNO-nsperday.svg
+   * - .. figure:: results/pizdaint/benchPEP.svg
 
           **benchPEP** - 4 mpi x 6 omp (SMT on)
 
@@ -551,11 +676,128 @@ should be offloaded to GPU.
 
           
 	   
+GROMACS performance on Juwels Booster module (JSC, Germany)
+-----------------------------------------------------------
+
+https://apps.fz-juelich.de/jsc/hps/juwels/booster-overview.html
+
+**Hardware**
+
+Focus on Booster module
+
+Each node has:
+   -  Processor: 2x24 core AMD EPYC 7402 (48 physical cores total, 96 logical cores with SMT)
+   -  Memory: 512 GB RAM
+   -  GPU: 4x NVIDIA A100, 40 GB
+   -  Interconnect: Mellanox HDR200 InfiniBand 
 
 
+**Software**
+
+Relevant software stack:
+   -  Compilers: GCC, Intel, NVHPC
+   -  MPI runtimes: OpenMPI, ParaStationMPI
+   -  CUDA
+
+**Build**
+
+Build instructions to build a GPU version of GROMACS 2022 using CUDA-aware MPI with GCC and OpenMPI:
+
+.. include:: build/juwelsbooster/gromacs_2022.rst
+
+Build intructions to build a GPU version of GROMACS 2022 without MPI using GCC
+
+.. include:: build/juwelsbooster/gromacs_2022_nompi.rst
+
+**Run**
+
+Batch script to run on one node using all 4 GPUs; with GPU offloading for nonbonded, pme, and bonded; and GPU direct communication enabled.
+
+.. include:: run/juwelsbooster/jobscript.rst
+
+**Benchmark results**
+
+We investaged the difference between different GPU offloading scenarios and other performance settings for the strong scaling of our benchmark suite.
+
+.. list-table::
+   :align: center
+	   
+   * - .. figure:: results/juwelsbooster/benchHBS20k.svg
+     
+          **20k_HBS**
+     
+     - .. figure:: results/juwelsbooster/benchMEM.svg
+ 
+          **benchMEM**
+	   
+   * - .. figure:: results/juwelsbooster/benchHBS465k.svg
+
+          **465k_HBS**
+
+     - .. figure:: results/juwelsbooster/benchRIB.svg
+
+          **benchRIB**
+
+   * - .. figure:: results/juwelsbooster/benchPEP.svg
+
+          **benchPEP**
+
+     - .. 
+
+All simulations were run using 1 MPI task per GPU, 12 OpenMP threads per MPI task, and SMT turned off.
+
+The different options are as follows:
+   -  nb - only non-bonded interactions are offloaded to the GPU.
+   -  nb, pme, bonded - all interactions (non-bonded, pme, and bonded) are offloaded to GPU.
+   -  direct GPU comms - the GMX_ENABLE_DIRECT_GPU_COMM flag is set. This is a non-default feature that enables communications between GPUs to done directly between the GPU memory spaces rather than being routed via the CPUs. This can offer performace benefits. It is only possible when using GROMACS internal thread-MPI or if GROMACS was build with a CUDA aware MPI library.
+   -  cpu_bind - explicit CPU bindings are used with the srun command. The binding command used is ``srun --cpu_bind=mask_cpu:0xFFF000,0xFFF,0xFFF000000000,0xFFF000000  gmx_mpi     mdrun``. This is due to the specific hardware layout of JuwelsBooster.
+   -  update - The update GPU option is used. This can only be used when the constrains settings are changed from ``constraints=all-bonds`` to ``constraints=h-bonds``. (We can only do this for the benchPEP system where we use the benchPEP-h.tpr from the previously referenced webpage).
+
+We see that best performance is obtained when as much as possible is offloaded to the GPU. The explicit CPU binding settings slightly increase performance. The largest extra performace increase occurs when the ``update gpu`` option can be set -- this results in as much of the calculation as possible being run on the GPU. The direct GPU communications settings also increases performace, however this feature is still in development and sometimes gives errors so output should be checked before using it.
+The parallel scaling is generally poor when more than 1 node is used. This is because GROMACS 2022 can only have 1 PME GPU rank, for 1 node on JuwelsBooster there are 4 GPUs so 1/4 GPUs are used for PME calculations, this is close to ideal for typical GROMACS simulations. For 2 nodes then 1/8 GPUs are used for PME calculations, this is under-balanced relative to the other 7 GPUs doing PP calculations which have to wait for the PME calculations resulting in poorer parallel performance.
 
 
+**Multiple simulations per Node/ per GPU**
 
+Only large systems can fully make use of an entire Juwels Booster node (4 GPUs). For smaller systems It can be beneficial to
+have multiple simulations per node, or even per GPU to get higher throughput. On Juwels booster you are always charged for a full node.
+
+We have found that you *must use the Non-MPI version of gromacs for this*. This is because it can be lauched without `srun` so there is more flexibility in sharing the GPU resources.
+
+Suppose you have a set of 8 folders labelled 1 2 3 4 5 6 7 8. You can run 8 simultaneous simulations, each using 6 threads, and each sharing a GPU with one other simulation. The script below will lauch such a simulation:
+
+.. include:: run/juwelsbooster/multisimscript.rst
+   
+The script also contains options for 4,16,24, or 48 simulations per node.
+
+CUDA MPS in enabled in the script which allows for more efficient GPU sharing.
+
+
+The folders array contains 8 folder names.
+The gputasks array contains the GROMACs gpu ID mapping. There are two numbers per simulation for the
+two GPU task per simualtion: PP and PME. These are the same number so they run on the same GPU. The order
+is specific to Juwels Boosters setup.
+
+The bindings array evaluates to:
+(0-5 6-11 12-17 18-23 24-29 30-35 36-41 42-47)
+
+With the gputasks array:
+(11 11 00 00 33 33 22 22)
+
+This results in the first simulation using cpus 0 to 5 and gpu 1. CPUs 0 to 5 are
+closest connected to GPU 1 as per the Juwels Booster hardware information: https://apps.fz-juelich.de/jsc/hps/juwels/booster-overview.html.
+
+
+The plot below shows the total throughput on one node for multiple simulations.
+This is for the benchMEM benchmark.
+
+
+.. figure:: results/juwelsbooster/benchMEM_throughput.svg
+
+**BenchMEM** -- throughput for multiple simulations per Node/ per GPU.
+
+We can see that highest throughput is achived when 16 simulations are run per node (4 simulations per GPU). For smaller systems the optimum number of simulations per node will be larger, for larger systems it will be smaller.
+The CUDA MPS setting significantly increases the performace, this is because this setting allows mutliple process to better share a single GPU.
 
 ----------------------------------------------------------
 Acting on performance-related warnings found in ``md.log``
@@ -593,6 +835,8 @@ This section provides guidance on identifying, understanding, and acting on perf
      Look in the log file for details on the domain decomposition
      
 
+  - You will need to use a smaller number of MPI tasks, performance can possibly be increased by using hybrid MPI/OpenMPI execution and increasing the number of OpenMP threads.
+
 -  Fatal error (abort):
 
    ::
@@ -627,7 +871,16 @@ This section provides guidance on identifying, understanding, and acting on perf
 
     - This error is because currently (GROMACS 2020) offloading of update and constraints on a GPU is not supported with domain decomposition, free-energy, virtual sites, Ewald surface correction, replica exchange, constraint pulling, orientation restraints and computational electrophysiology.
 
-      
+
+- Fatal error (abort):
+
+  ::
+
+     GPU direct communications cannot be used for multi-dimensional halo exchanges
+     with more than one pulse in the second or third dimension. Please try using
+     fewer ranks (or change the decomposition with '-dd'), or if that does not work
+     then disable GPU direct communications.
+
       
 **Performance warnings**
       
