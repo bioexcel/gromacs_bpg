@@ -476,9 +476,8 @@ Post-processing and analysis tools
 
 With the simulation complete, we can analyse the simulation trajectory and 
 understand what the simulation has demonstrated. GROMACS offers a number of 
-post-simulation analysis tools. In this section, we will discuss tools that 
-can be used to: generate the thermodynamic properties of interest; obtain 
-radial distribution functions and correlation functions; 
+post-simulation analysis tools. 
+Note on file formats: in these examples any ``${trajectory}.trr`` file could also be a ``.xtc`` file.
 
 Thermodynamic properties of the system
 ======================================
@@ -503,19 +502,20 @@ page.
 Generating an index file
 ========================
 
-GROMACS has a post-analysis tool for generating radial distribution functions 
-(RDFs). Before generating an RDF, we will need to create a GROMACS index 
-(``.ndx``) file to categorise the various parts that compose the simulation 
-into indexed groups. This can be done with the ``gmx make_ndx`` command. To 
+All information about a system is contained in the ``.tpr`` file. This includes 
+the various groups that are present. E.g. the C-alpha carbon atoms, the water molecules etc. 
+These groups can be used by the various gromacs post-processing commands. You may need to create your
+own group defenitions for your analysis, this can be done make making a new index file (``.ndx``). 
+
+This can be done with the ``gmx make_ndx`` command. To 
 use it, run:
 
 .. code-block:: bash
 
-  gmx make_ndx -f ${INPUT}.gro -o ${OUTPUT}.ndx
+  gmx make_ndx -f ${INPUT}.tpr -o ${OUTPUT}.ndx
   
-where ``${INPUT}.gro`` is a GROMACS configuration file for the trajectory you 
-are wanting to calculate the RDF for. Provided you used the default names in 
-your ``mdrun``, you can simply use ``confout.gro``. The ``make_ndx`` command 
+where ``${INPUT}.tpr`` is a GROMACS run input file for the trajectory you 
+are wanting to calculate the RDF for. The ``make_ndx`` command 
 will analyse the system, and output the default index groups. It is possible 
 to create new index groups by using the command prompts listed (for instance, 
 you can create a group composed of only the oxygens from the solvent waters by 
@@ -529,34 +529,37 @@ For more complex manipulations than selecting all of one group of atoms,
 GROMACS provides the ``gmx select`` option. This will allow you to define 
 the exact time or particles or regions of interest within your simulation. 
 You can find more information on how to use this in the GROMACS manual
-`Groups and Selections <https://manual.gromacs.org/documentation/2019/reference-manual/analysis/using-groups.html#selections>`_
+`Groups and Selections <https://manual.gromacs.org/current/reference-manual/analysis/using-groups.html#selections>`_
 page.
 
 
 Radial distribution function
 ============================
 
-Once an appropriate index file is generated, with the atoms for which an RDF 
-is to be calculated indexed into appropriate groups, we can use the 
-``gmx rdf`` command to generate the RDFs. This is done by running:
+The ``gmx rdf`` command to generate the RDFs. This is done by running:
 
 .. code-block:: bash
 
-  gmx rdf -f ${TRAJECTORY_INPUT}.trr -n ${INDEX_INPUT}.ndx  \
-          -ref ${REFERENCE_GROUP} -sel ${SELECTED_GROUP} -bin ${BIN_WIDTH}
-          -o ${OUTPUT}.xvg
+  gmx rdf -f ${TRAJECTORY_INPUT}.trr -s ${INPUT}.tpr -n ${INDEX_FILE}.ndx \
+          -bin ${BIN_WIDTH} -rmax ${MAX_DISTANCE} -o ${OUTPUT}.xvg
   
 where ``${TRAJECTORY_INPUT}.trr`` is the trajectory file for which you would 
-like to generate an RDF, and ``${INDEX_INPUT}.ndx`` is the index file that you 
-produced using ``make_ndx``. ``${REFERENCE_GROUP}`` should be replaced with 
-the name of the principal group to be used in the RDF as it appears in the 
-``${INDEX_INPUT}.ndx`` file. Likewise, ``${SELECTED_GROUP}`` should be 
-replaced with the name of the atom group(s) for which you want to calculate 
-the RDF against the position of the reference group (*e.g.* if you want to 
-calculate the RDF between sodium ions and chloride ions, your reference 
-group would be one of ``NA`` or ``CL``, and your selected group would be the 
-one not chosen as reference). Note that it is possible for your reference and 
-selected groups to be the same group.
+like to generate an RDF, and ``${INDEX_FILE}.ndx`` is the index file that you 
+produced using ``make_ndx`` (this is optinal if you are using the default defined groups). Running this command will first prompt you to choose a reference group
+and then prompt you to choose a selection group. The RDF will be computed between these two groups and 
+will be written to the ``${OUTPUT}.xvg`` file. They can be the same group.
+Note that similar to other commands you can specify the selections with command line arguments if you wish, 
+this can useful for automating scripts. For example to calculate the rdf
+between the C-alpha carbons of a system (with file name preifx ``md``) the following command can be used:
+
+.. code-block:: bash
+
+  gmx rdf -f md.xtc -s md.tpr -bin 0.02 -rmax 5.0 -ref '"C-alpha"' -sel '"C-alpha"'
+
+Where the histogram bin width has been set to 0.02nm and the max distance set to 5nm.
+
+For more information and options, please look at the GROMACS manual page
+on the `gmx msd command <https://manual.gromacs.org/current/onlinehelp/gmx-rdf.html>`_.
 
 Mean squared displacement and velocity autocorrelation functions
 ================================================================
@@ -568,24 +571,23 @@ on how to generate these functions within GROMACS but you can use these links
 to find an overview of the theory behind the 
 `MSD <http://manual.gromacs.org/documentation/current/reference-manual/analysis/mean-square-displacement.html>`_
 and the 
-`VACF <http://manual.gromacs.org/documentation/2019/reference-manual/analysis/correlation-function.html>`_.
+`VACF <http://manual.gromacs.org/documentation/current/reference-manual/analysis/correlation-function.html>`_.
 
 Calculating the MSD of parts of a system can be done using the ``gmx msd``. 
 This can be run using:
 
 .. code-block:: bash
 
-  gmx msd -f ${INPUT_TRAJECTORY}.trr -s ${INPUT_TOPOLOGY}.tpr -o ${OUTPUT}.xvg
+  gmx msd -f ${INPUT_TRAJECTORY}.trr -s ${INPUT}.tpr -o ${OUTPUT}.xvg
   
 where ``${INPUT_TRAJECTORY}.trr`` is the trajectory file of the simulation for 
-which the MSD is being calculated, and ``${INPUT_TOPOLOGY}.tpr`` can be the 
-input file used to obtain this trajectory (note that it is possible to use 
-the final topology ``confout.gro`` file here instead to obtain the same 
-results). Running this command will prompt you to choose the group for which 
-you would like the MSD. Note that, if the group you are looking for is not 
+which the MSD is being calculated and ``${INPUT}.tpr`` is the 
+input file used to obtain this trajectory. 
+Running this command will prompt you to choose the group for which 
+you would like the MSD.  The computed MSD will be written to ${OUPUT}.xvg.
+Note that, if the group you are looking for is not 
 present in the list, you can generate an index file (see 
-`Generating an index file`_) where you can define this new group. To include 
-this index file, add the option ``-n ${INDEX_FILE}.ndx`` to the command above.
+`Generating an index file`_) where you can define this new group. 
 For more information and options, please look at the GROMACS manual page on 
 the `gmx msd command <http://manual.gromacs.org/documentation/current/onlinehelp/gmx-msd.html#gmx-msd>`_.
 
@@ -593,7 +595,7 @@ VACFs can be generated using the ``gmx velacc`` command:
 
 .. code-block:: bash
 
-  gmx velacc -f ${INPUT_TRAJECTORY}.trr -o ${OUTPUT}.xvg
+  gmx velacc -f ${INPUT_TRAJECTORY}.trr -s ${INPUT}.tpr -o ${OUTPUT}.xvg
   
 where ``${INPUT_TRAJECTORY}.trr`` is the trajectory file of the simulation 
 for which the VACF is being produced. You will get a prompt asking for which 

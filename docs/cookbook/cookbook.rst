@@ -128,7 +128,7 @@ may be beneficial for an older GPU sitting alongside newer CPU.
 
 Constraint calculations and coordinate updates default to CPU but can
 be offloaded with ``-update gpu``, though only to NVIDIA GPUs, only if
-GROMACS is executes on a single rank, and ( or GROMACS 2020)
+GROMACS is executes on a single rank, and (for GROMACS 2020)
 subject to further limitations (no free-energy, no virtual sites, no
 Ewald surface correction, no replica exchange, no constraint pulling,
 no orientation restraints and no computational electrophysiology).
@@ -217,7 +217,7 @@ Before beginning expensive ``mdrun`` simulations you should benchmark your
 system to ensure you are using the optimal amount of HPC resources.
 Usually this mean how many nodes/CPUs/GPUs you choose to use. 
 
-To do this you should take your system, run it for a short time (10,00 steps
+To do this you should take your system, run it for a short time (10,000 steps
 should be sufficient) and increase the number of CPUs. You then look at the 
 performance figure in ns/day. It is helpful to plot a graph of CPU count vs 
 performance. Examples of these are shown in the following section for different
@@ -369,7 +369,7 @@ instance by disabling dynamic load balancing (``-dlb no``) and PME
 tuning (``-tunepme no``), which also allows us to illustrate the
 strength of load imbalance in different execution scenarios.
 
-The figures below show benchmark performance for GROMACS 2020.2 scales
+The figures below show how benchmark performance for GROMACS 2020.2 scales
 with increasing node count on HAWK for different combinations of MPI
 ranks and OpenMP threads per rank. Results using simultaneous
 multithreading (SMT) are not shown as these follow similar trends but
@@ -478,12 +478,7 @@ Each node on Discoverer has two 64-core AMD EPYC processors. This gives a total 
 The CPUs have Simultaneous Multi-Threading (SMT) which means each physical core has two logical cores, so each node will
 appear to have 256 cores to most applications. We have found that SMT offers a small performance benefit, thus recommend keeping it turned on. For most jobs this means per node you should have 128 MPI tasks (1 per physical core) and 2 OpenMP threads per MPI task (1 per logical core, 2 logical cores per physical core).
 
-For consistent benchmarking we use the additional arguments: 
-
--  ``-dlb yes``  turns on dynamic load balancing which shifts particles between MPI ranks to optimize performance. This can interfere with the tunepme setting which will optimize various aspects of the PME and DD algorithms, shifting load between ranks.
--  ``-notunepme`` turns off PME load balancing because it can interfere with the dlb yes setting. The PME settings can be tuned separately using gmx tune_pme.
--  ``-noconfout`` does not create the output conformation as this is not needed for benchmarking.
--  ``-resethway`` resets the performance timers halfway through the run, this removes the overhead of initialization and load balancing from the reported timings.
+For consistent benchmarking we use the additional arguments explained in `General guidance for benchmarking`_.
 
 .. include:: run/discoverer/jobscript.rst
 
@@ -705,7 +700,7 @@ Build instructions to build a GPU version of GROMACS 2022 using CUDA-aware MPI w
 
 .. include:: build/juwelsbooster/gromacs_2022.rst
 
-Build intructions to build a GPU version of GROMACS 2022 without MPI using GCC
+Build intructions to build a GPU version of GROMACS 2022 without MPI using GCC:
 
 .. include:: build/juwelsbooster/gromacs_2022_nompi.rst
 
